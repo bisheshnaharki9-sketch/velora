@@ -900,6 +900,7 @@ function AdminPanel({ onLogout }) {
   const [filter, setFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [videoInputs, setVideoInputs] = useState({});
+  const [generating, setGenerating] = useState({});
 
   const fetchAll = useCallback(async () => {
     try {
@@ -930,6 +931,27 @@ function AdminPanel({ onLogout }) {
     if (!url) return;
     await updateLead(lead.id, { video_url: url, status: "demo_scheduled" });
     setVideoInputs(prev => ({ ...prev, [lead.id]: "" }));
+  };
+
+  const autoGenerate = async (lead) => {
+    setGenerating(prev => ({ ...prev, [lead.id]: true }));
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lead_id: lead.id }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, video_url: data.video_url, status: "demo_scheduled" } : l));
+        alert("✅ Video generated and saved automatically!");
+      } else {
+        alert("❌ Error: " + data.error);
+      }
+    } catch (e) {
+      alert("❌ Failed to generate: " + e.message);
+    }
+    setGenerating(prev => ({ ...prev, [lead.id]: false }));
   };
 
   const statuses = ["new", "demo_scheduled", "demo_done", "closed", "paid"];
@@ -1001,22 +1023,39 @@ function AdminPanel({ onLogout }) {
                         <div style={{ color: "#4b5563", fontSize: 12, marginTop: 6 }}>
                           By <strong style={{ color: "#a78bfa" }}>{lead.sales_name}</strong> · {new Date(lead.submitted_at).toLocaleDateString()} · Commission: <strong style={{ color: "#f59e0b" }}>${commission}</strong>
                         </div>
-                        {lead.video_url && <div style={{ marginTop: 6 }}><a href={lead.video_url} target="_blank" rel="noreferrer" style={{ color: "#a78bfa", fontSize: 13 }}>🎬 Video sent</a></div>}
 
-                        {/* VIDEO UPLOAD */}
-                        {!lead.video_url && (
-                          <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
-                            <input
-                              placeholder="Paste Higgsfield video link here..."
-                              value={videoInputs[lead.id] || ""}
-                              onChange={e => setVideoInputs(prev => ({ ...prev, [lead.id]: e.target.value }))}
-                              style={{ ...S.input, flex: 1, fontSize: 13, padding: "8px 10px" }}
-                            />
-                            <button onClick={() => sendVideo(lead)} style={{ ...S.purpleBtn, fontSize: 13, padding: "8px 14px", whiteSpace: "nowrap" }}>Send Video</button>
+                        {/* VIDEO UPLOAD OR AUTO GENERATE */}
+                        {!lead.video_url && lead.video_url !== "generating..." && (
+                          <div style={{ marginTop: 12 }}>
+                            {/* AUTO GENERATE BUTTON */}
+                            <button
+                              onClick={() => autoGenerate(lead)}
+                              disabled={generating[lead.id]}
+                              style={{ ...S.purpleBtn, fontSize: 13, padding: "8px 16px", marginBottom: 10, width: "100%", opacity: generating[lead.id] ? 0.7 : 1 }}
+                            >
+                              {generating[lead.id] ? "⏳ Generating video... (~60s)" : "🤖 Auto Generate Video"}
+                            </button>
+                            <div style={{ display: "flex", gap: 8 }}>
+                              <input
+                                placeholder="Or paste video link manually..."
+                                value={videoInputs[lead.id] || ""}
+                                onChange={e => setVideoInputs(prev => ({ ...prev, [lead.id]: e.target.value }))}
+                                style={{ ...S.input, flex: 1, fontSize: 13, padding: "8px 10px" }}
+                              />
+                              <button onClick={() => sendVideo(lead)} style={{ ...S.ghostBtn, fontSize: 13, whiteSpace: "nowrap" }}>Send</button>
+                            </div>
                           </div>
                         )}
-                      </div>
-                      <select
+                        {lead.video_url === "generating..." && (
+                          <div style={{ marginTop: 10, background: "#1a0a3a", border: "1px solid #6d28d9", borderRadius: 8, padding: "10px 14px", color: "#a78bfa", fontSize: 13 }}>
+                            ⏳ AI is generating the video... refresh in 60 seconds.
+                          </div>
+                        )}
+                        {lead.video_url && lead.video_url !== "generating..." && (
+                          <div style={{ marginTop: 10 }}>
+                            <a href={lead.video_url} target="_blank" rel="noreferrer" style={{ color: "#a78bfa", fontSize: 13 }}>🎬 Video ready → {lead.video_url.substring(0, 50)}...</a>
+                          </div>
+                        )}
                         value={lead.status}
                         onChange={e => updateLead(lead.id, { status: e.target.value })}
                         style={{ background: STATUS_COLOR[lead.status] + "22", color: STATUS_COLOR[lead.status], border: `1px solid ${STATUS_COLOR[lead.status]}66`, padding: "6px 12px", borderRadius: 8, fontSize: 13, cursor: "pointer", fontWeight: 600, height: "fit-content" }}
