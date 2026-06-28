@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 const SUPABASE_URL = "https://jkqrwrsbjajdcxzuidst.supabase.co";
 const SUPABASE_KEY = "sb_publishable_YAFSbNHLsYF40rOGWP7ymg_ro4sci2v";
-const MAPS_KEY = "AIzaSyDeCHhBmrH0E2H1Vs2gWgcJU15v_fpZkiE";
+const MAPS_KEY = "AIzaSyBfiq0LyYI-UvERiMSylGYTgSxBxcxTfV0";
 const ADMIN_PASSWORD = "Nirmala_Bishesh_#@!";
 const AIRTM_USERNAME = "nirmalaboj9em1yh";
 const AIRTM_EMAIL = "nirmalabartaulanaharki@gmail.com";
