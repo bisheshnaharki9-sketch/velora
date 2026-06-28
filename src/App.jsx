@@ -148,7 +148,7 @@ function LandingPage({ onNav }) {
 
 // ─── REGISTER ─────────────────────────────────────────────────────────────────
 function RegisterPage({ onNav }) {
-  const [form, setForm] = useState({ name: "", email: "", phone: "", pay_method: "Airtm", pay_address: "" });
+  const [form, setForm] = useState({ name: "", email: "", phone: "", pay_method: "Airtm", pay_address: "", password: "", confirm_password: "" });
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -157,11 +157,12 @@ function RegisterPage({ onNav }) {
   const handle = e => setForm({ ...form, [e.target.name]: e.target.value });
 
   const submit = async () => {
-    if (!form.name || !form.email || !form.phone || !form.pay_address) { setError("Fill in all fields."); return; }
+    if (!form.name || !form.email || !form.phone || !form.pay_address || !form.password) { setError("Fill in all fields."); return; }
+    if (form.password.length < 6) { setError("Password must be at least 6 characters."); return; }
+    if (form.password !== form.confirm_password) { setError("Passwords don't match."); return; }
     if (!agreed) { setError("You must agree to the terms before joining."); return; }
     setLoading(true);
     try {
-      // Check max salespeople limit
       const existing = await db.get("salespeople", "?select=id");
       if (existing && existing.length >= MAX_SALESPEOPLE) {
         setError("Sorry, Velora's sales team is currently full (50/50). Check back later.");
@@ -169,7 +170,8 @@ function RegisterPage({ onNav }) {
         return;
       }
       const code = "VLR-" + Math.random().toString(36).substring(2, 7).toUpperCase();
-      await db.post("salespeople", { ...form, code, commission_rate: 15, status: "pending" });
+      const { confirm_password, ...formData } = form;
+      await db.post("salespeople", { ...formData, code, commission_rate: 15, status: "pending" });
       setSuccess(true);
     } catch (e) {
       setError("Email already registered or server error.");
@@ -202,6 +204,14 @@ function RegisterPage({ onNav }) {
               <input name={f.name} type={f.type || "text"} value={form[f.name]} onChange={handle} style={S.input} />
             </div>
           ))}
+          <div style={{ marginBottom: 16 }}>
+            <label style={S.label}>Password (min 6 characters)</label>
+            <input name="password" type="password" value={form.password} onChange={handle} style={S.input} />
+          </div>
+          <div style={{ marginBottom: 16 }}>
+            <label style={S.label}>Confirm Password</label>
+            <input name="confirm_password" type="password" value={form.confirm_password} onChange={handle} style={S.input} />
+          </div>
           <div style={{ marginBottom: 16 }}>
             <label style={S.label}>Payment Method</label>
             <select name="pay_method" value={form.pay_method} onChange={handle} style={S.input}>
@@ -247,23 +257,20 @@ function RegisterPage({ onNav }) {
 // ─── LOGIN ────────────────────────────────────────────────────────────────────
 function LoginPage({ onNav, onLogin }) {
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const submit = async () => {
+    if (!email || !password) { setError("Enter your email and password."); return; }
     setLoading(true);
     try {
       const rows = await db.get("salespeople", `?email=eq.${encodeURIComponent(email)}`);
       if (!rows || rows.length === 0) { setError("No account found with that email."); setLoading(false); return; }
       const sp = rows[0];
-      if (sp.status === "pending") {
-        setError("⏳ Your account is pending approval. We'll activate it within 24 hours.");
-        setLoading(false); return;
-      }
-      if (sp.status === "banned") {
-        setError("🚫 Your account has been removed due to a terms violation.");
-        setLoading(false); return;
-      }
+      if (sp.password !== password) { setError("Wrong password."); setLoading(false); return; }
+      if (sp.status === "pending") { setError("⏳ Your account is pending approval. We'll activate it within 24 hours."); setLoading(false); return; }
+      if (sp.status === "banned") { setError("🚫 Your account has been removed due to a terms violation."); setLoading(false); return; }
       onLogin(sp);
       onNav("dashboard");
     } catch { setError("Error connecting. Try again."); }
@@ -274,7 +281,14 @@ function LoginPage({ onNav, onLogin }) {
     <AuthLayout title="Welcome back" sub="Log in to your Velora account">
       <div style={{ marginBottom: 16 }}>
         <label style={S.label}>Email Address</label>
-        <input type="email" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} style={S.input} />
+        <input type="email" value={email} onChange={e => setEmail(e.target.value)} style={S.input} />
+      </div>
+      <div style={{ marginBottom: 20 }}>
+        <label style={S.label}>Password</label>
+        <input type="password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} style={S.input} />
+      </div>
+      <div style={{ textAlign: "right", marginBottom: 16, marginTop: -12 }}>
+        <span style={{ color: "#6b7280", fontSize: 13 }}>Forgot password? Contact us on WhatsApp.</span>
       </div>
       {error && <div style={{ color: "#f87171", fontSize: 13, marginBottom: 12 }}>{error}</div>}
       <button onClick={submit} disabled={loading} style={{ ...S.purpleBtn, width: "100%", padding: 14, opacity: loading ? 0.7 : 1 }}>{loading ? "Logging in..." : "Log In"}</button>
